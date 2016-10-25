@@ -38,7 +38,6 @@ hidden_dim = 300
 def create_reader(path):
     return MinibatchSource(CTFDeserializer(path, StreamDefs(
         query         = StreamDef(field='S0', shape=input_dim,   is_sparse=True),
-        intent_unused = StreamDef(field='S1', shape=num_intents, is_sparse=True),  # BUGBUG: unused, and should infer dim
         slot_labels   = StreamDef(field='S2', shape=label_dim,   is_sparse=True)
     )))
 

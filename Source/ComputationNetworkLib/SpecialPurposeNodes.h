@@ -765,4 +765,87 @@ public:
 template class DummyCriterionNode<float>;
 template class DummyCriterionNode<double>;
 
+// -----------------------------------------------------------------------
+// TraceNode (input, say='', enabled=true, gradient=false, showFrequency=10, showFirst=10, format=[]) -- trace a node's value
+// Traces a node's value using WriteMinibatchWithFormatting().
+// -----------------------------------------------------------------------
+
+//template<typename T>
+//using TensorFunctionFunc = typename void(*)  ( TensorView<ElemType>&);
+//using TouchCallBack = void(*)(GLRenderer*, const MotionEvent&, std::vector<T >);
+
+
+
+
+
+template <class ElemType>
+class FunctionNode : public ComputationNode<ElemType>, public NumInputs<1>
+{
+//	using TensorFunctionFunc = void(*)  (TensorView<ElemType>&);
+	typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;
+	typedef void(*TensorFunctionFunc)  (TensorView<ElemType>&);
+	
+	static const std::wstring TypeName() { return L"Trace"; }
+
+public:
+	FunctionNode(DEVICEID_TYPE deviceId, const wstring& name)
+		: Base(deviceId, name)
+	{
+	}
+
+	FunctionNode(const ScriptableObjects::IConfigRecordPtr configp);
+	virtual void Save(File& fstream) const override;
+	virtual void Load(File& fstream, size_t modelVersion) override;
+	virtual void /*IComputationNode::*/ BeginForwardProp() override;
+	virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override;
+	virtual void /*ComputationNode::*/ BackpropTo(const size_t inputIndex, const FrameRange& fr) override;
+	virtual void /*ComputationNode::*/ Validate(bool isFinalValidationPass) override;
+
+	virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
+	virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+
+private:
+
+	//void Log(const FrameRange& fr, bool logGradientInstead) const;
+	void FunctionNodeExternCall(TensorView<ElemType>& tensor);
+//	TensorFunctionFunc GetFunc();
+	void GetFunc();
+
+private:
+	static map <string, TensorFunctionFunc> create_map()
+	{
+		map <string, TensorFunctionFunc> m;
+		return m;
+	}
+	//typedef int (A::*MFP)(int);
+	static map <string, TensorFunctionFunc> fmap;
+
+	//int f(int x) { return x + 1; }
+	//int g(int x) { return x + 2; }
+
+
+	//A() {
+	//	fmap.insert(std::make_pair("f", &A::f));
+	//	fmap.insert(std::make_pair("g", &A::g));
+	//}
+
+	std::string m_funcName;
+
+	//// configuration
+	//std::wstring m_message;
+	//size_t m_logFrequency = 0; // Note: This can be changed in the debugger on the fly.
+	//size_t m_logFirst = 0;
+	//bool m_logGradientToo = false;
+	//WriteFormattingOptions m_formattingOptions;
+	//size_t m_onlyUpToRow = SIZE_MAX;
+	//size_t m_onlyUpToT = SIZE_MAX;
+	//// cached stuff (not persisted)
+	//size_t m_numMBsRun = 0;
+	//std::vector<std::string> m_labelMapping;
+};
+
+//static FunctionNode<float>::fmap = FunctionNode<float>::create_map();
+//FunctionNode<double>::fmap = FunctionNode<double>::create_map();
+
+
 } } }

@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <memory>
 
+
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 // -----------------------------------------------------------------------
@@ -144,5 +145,190 @@ template <class ElemType>
 
 template class TraceNode<float>;
 template class TraceNode<double>;
+
+//const map<int, int> A::myMap = A::create_map();
+//
+
+
+template <class ElemType>
+FunctionNode<ElemType>::FunctionNode(const ScriptableObjects::IConfigRecordPtr configp) :
+	FunctionNode(configp->Get(L"deviceId"), L"<placeholder>")
+{
+	AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
+	m_funcName = std::string(m_nodeName.begin(), m_nodeName.end());
+	//m_message = (const std::wstring&)configp->Get(L"say");
+	//m_logFirst = configp->Get(L"logFirst");
+	//m_logFrequency = configp->Get(L"logFrequency");
+	//m_logGradientToo = configp->Get(L"logGradientToo");
+	//m_formattingOptions = WriteFormattingOptions(*configp);
+	//m_onlyUpToRow = configp->Get(L"onlyUpToRow");
+	//m_onlyUpToT = configp->Get(L"onlyUpToT");
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::Save(File& fstream) const /*override*/
+{
+	Base::Save(fstream);
+	//fstream << m_message;
+	//fstream << m_logFirst;
+	//fstream << m_logFrequency;
+	//fstream << m_logGradientToo;
+	//m_formattingOptions.Save(fstream);
+	//// BUGBUG: This serializes the pathname of the mapping file to disk. Not nice. But no better solution.
+	//fstream << m_onlyUpToRow;
+	//fstream << m_onlyUpToT;
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::Load(File& fstream, size_t modelVersion) /*override*/
+{
+	Base::Load(fstream, modelVersion);
+	//fstream >> m_message;
+	//fstream >> m_logFirst;
+	//fstream >> m_logFrequency;
+	//fstream >> m_logGradientToo;
+	//m_formattingOptions.Load(fstream, modelVersion);
+	//fstream >> m_onlyUpToRow;
+	//fstream >> m_onlyUpToT;
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::BeginForwardProp() /*override*/
+{
+	Base::BeginForwardProp();
+	//++m_numMBsRun;
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+	size_t rank = DetermineElementwiseTensorRank();
+	auto result = ValueTensorFor(rank, fr);
+	auto input = InputRef(0).ValueTensorFor(rank, fr);
+	FunctionNodeExternCall(input);
+	result.AssignCopyOf(input);
+
+	// do the tracing
+	//Log(fr, false/*means log value*/);
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::FunctionNodeExternCall(TensorView<ElemType>& tensor)
+{
+	
+	//typename map<string, TensorFunctionFunc>::iterator it = fmap.find(m_funcName);
+		typename map<string, TensorFunctionFunc>::iterator it = fmap.find("f");
+
+
+	TensorFunctionFunc func; 
+	if (it == fmap.end()) 
+	{ // if no instance with the proper type was found, make one
+		GetFunc(); // lazy initialization part
+	}
+	else 
+	{ //if already had an instance
+		func = it->second; //The return value will be the found fruit
+	}
+
+	func(tensor);
+}
+
+
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::GetFunc() /*override*/
+{
+	//fmap[type] = func;     // adding the newly created Fruit to the types map for later lookup
+
+	fprintf(stdout, "C++ dlopen");
+
+
+	// open the library
+	fprintf(stdout, "Opening hello.so...\n");
+	void* handle = dlopen("./hello.so", RTLD_LAZY);
+
+
+	if (!handle) {
+	/*	auto msg = "Cannot open library" + std::to_string(dlerror());
+		fprintf(stdout, msg);
+		throw std::exception(msg);*/
+		RuntimeError("Cannot open library '%s'", dlerror());
+	}
+
+	// load the symbol
+//	cout << "Loading symbol hello...\n";
+	//typedef void(*hello_t)();
+
+	// reset errors
+	dlerror();
+	TensorFunctionFunc hello = (TensorFunctionFunc)dlsym(handle, m_funcName.c_str());
+	const char *dlsym_error = dlerror();
+	if (dlsym_error) {
+		//cerr << "Cannot load symbol 'hello': " << dlsym_error <<
+		//	'\n';
+		dlclose(handle);
+		RuntimeError("FunctionNode Cannot load symbol  '%s'", dlsym_error);
+	//	throw std::exception("Cannot load symbol 'hello': " , );
+		//return 1;
+	}
+
+	// use it to do the calculation
+//	cout << "Calling hello...\n";
+	//hello();
+
+	// close the library
+	fprintf(stdout, "Closing library...\n");
+	dlclose(handle);
+
+}
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::BackpropTo(const size_t inputIndex, const FrameRange& fr) /*override*/
+{
+	assert(inputIndex == 0); inputIndex;
+
+	size_t rank = DetermineElementwiseTensorRank();
+	auto sliceOutputGrad = GradientTensorFor(rank, fr);      // propagate from this one...
+	auto sliceInputGrad = InputRef(0).GradientTensorFor(rank, fr);      // ...to this one
+
+
+	// call function with derivative appended to name
+
+	sliceInputGrad.AddCopyOf(sliceOutputGrad);
+
+	//// do the tracing
+	//if (m_logGradientToo)
+	//	Log(fr, true/*means log gradient*/);
+}
+
+
+
+template <class ElemType>
+/*virtual*/ void FunctionNode<ElemType>::Validate(bool isFinalValidationPass) // override
+{
+	ValidateUnaryMap(isFinalValidationPass);
+	//if (isFinalValidationPass)
+	//{
+	//	if (m_labelMapping.empty() && (m_formattingOptions.isCategoryLabel || m_formattingOptions.isSparse) && !m_formattingOptions.labelMappingFile.empty())
+	//		File::LoadLabelFile(m_formattingOptions.labelMappingFile, m_labelMapping);
+	//}
+//	m_numMBsRun = 0;
+}
+
+
+template class FunctionNode<float>;
+template class FunctionNode<double>;
+
+//
+//template class FunctionNode<float>;
+//template class FunctionNode<double>;
+
+
+//const FunctionNode<float>::fmap = FunctionNode<float>::create_map();
+//FunctionNode<double>::fmap = FunctionNode<double>::create_map();
+
+//
+//template <class ElemType>
+//const map <string, TensorFunctionFunc> FunctionNode::fmap = FunctionNode::create_map();
 
 }}}

@@ -10,7 +10,6 @@
 #include "MinibatchSource.h"
 #include "HeapMemoryProvider.h"
 #include "ReaderShim.h"
-#include "Function.h"
 #include <tuple>
 #include "Value.h"
 #include "MPIWrapper.h"
@@ -75,6 +74,7 @@ namespace CNTK
         : m_epochEndReached(false),
           m_prevMinibatchSize(0),
           m_epochSize(MinibatchSource::InfinitelyRepeat),
+          m_randomizedWindow(MinibatchSource::DefaultRandomizationWindow),
           m_truncationLength(0),
           m_numWorkers(1),
           m_workerRank(0),
@@ -140,7 +140,14 @@ namespace CNTK
             m_epochSize = Microsoft::MSR::CNTK::requestDataSize;
         // Setting big value, but not the max in order to aviod bit overflow.
         else if (m_epochSize == MinibatchSource::InfinitelyRepeat)
-            m_epochSize = std::numeric_limits<size_t>::max()/2;
+            m_epochSize = std::numeric_limits<size_t>::max() / 2;
+
+        const wchar_t* randomizedWindowConfigurationKey = L"randomizationWindow";
+        if (augmentedConfiguration.Contains(randomizedWindowConfigurationKey))
+            m_randomizedWindow = augmentedConfiguration[randomizedWindowConfigurationKey].Value<size_t>();
+
+        if (m_randomizedWindow == MinibatchSource::DefaultRandomizationWindow)
+            m_randomizedWindow = randomizeAuto;
 
         const wchar_t* truncatedConfigurationKey = L"truncated";
         const wchar_t* truncationLengthConfigurationKey = L"truncationLength";
@@ -294,13 +301,11 @@ namespace CNTK
 
                 if (s.m_elementType == DataType::Float)
                 {
-                    auto matrixType = (s.m_storageFormat == StorageFormat::Dense) ? DENSE : SPARSE;
-                    auto matrixFormat = (s.m_storageFormat == StorageFormat::Dense) ? matrixFormatDense : matrixFormatSparseCSC;
-                    // Can we reuse this, not allocating it each time?
-                    auto dataMatrix = std::make_shared<Matrix<float>>(0, 0, input.GetMatrix<float>().GetDeviceId(), matrixType, matrixFormat);
+                    auto matrix = dynamic_pointer_cast<Matrix<float>>(input.matrix);
+                    if (!matrix)
+                        LogicError("Invalid matrix type.");
 
-                    std::swap(*dataMatrix, input.GetMatrix<float>());
-                    minibatchValuePtr = MakeSharedObject<PackedValue>(s.m_sampleLayout, dataMatrix, input.pMBLayout, /*readOnly =*/ false);
+                    minibatchValuePtr = MakeSharedObject<PackedValue>(s.m_sampleLayout, matrix, input.pMBLayout, /*readOnly =*/ false);
 
                     size_t numSamples = input.pMBLayout->GetActualNumSamples();
                     size_t numSequences = input.pMBLayout->GetNumSequences();

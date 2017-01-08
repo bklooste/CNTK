@@ -45,10 +45,13 @@
 %template() std::vector<CNTK::Axis>;
 %template() std::vector<CNTK::DeviceDescriptor>;
 %template() std::vector<CNTK::StreamConfiguration>;
+%template() std::vector<std::shared_ptr<CNTK::NDArrayView>>;
 %template() std::vector<std::shared_ptr<CNTK::Function>>;
 %template() std::vector<std::shared_ptr<CNTK::Learner>>;
+%template() std::vector<std::shared_ptr<CNTK::DistributedLearner>>;
 %template() std::pair<size_t, double>;
 %template() std::vector<std::pair<size_t, double>>;
+%template() std::vector<std::pair<CNTK::Variable, CNTK::Variable>>;
 
 // They are defined twice under CNTK::Internal and under CNTK namespace
 %ignore CNTK::Internal::Combine;
@@ -56,11 +59,12 @@
 %ignore CNTK::Internal::Gather;
 %ignore CNTK::Internal::Scatter;
 %ignore CNTK::Internal::Slice;
-%ignore CNTK::DistributedCommunicator::AggregateAsync;
+%ignore CNTK::Internal::MaxNumCPUThreadsSet;
 
 // These aren't exported from the CNTK C++ library
 %ignore CNTK::Internal::IsReversingTensorShapesInErrorMessagesEnabled;
 %ignore CNTK::Internal::IsSettingDefaultDeviceAlwaysAllowed;
+%ignore CNTK::Internal::IsRenamingFunctionsAllowed;
 %ignore CNTK::Internal::IsAutomaticUnpackingOfPackedValuesDisabled;
 %ignore CNTK::Internal::GetComputationNetworkTraceLevel;
 
@@ -874,6 +878,29 @@ public:
 }
 %enddef
 
+// Trainer initializers.
+// Because SWIG cannot properly handle smart pointers to derived classes (causes memory leak during the check),
+// we need custom constructors.
+
+%extend CNTK::Trainer
+{
+    Trainer(const FunctionPtr& model, const FunctionPtr& lossFunction, const FunctionPtr& evaluationFunction, const std::vector<DistributedLearnerPtr>& parameterLearners)
+    {
+        std::vector<LearnerPtr> learners;
+        learners.reserve(parameterLearners.size());
+        for(const auto& l : parameterLearners)
+            learners.push_back(l);
+        return new CNTK::Trainer(model, lossFunction, evaluationFunction, learners);
+    }
+
+    Trainer(const FunctionPtr& model, const FunctionPtr& lossFunction, const FunctionPtr& evaluationFunction, const std::vector<LearnerPtr>& parameterLearners)
+    {
+        return new CNTK::Trainer(model, lossFunction, evaluationFunction, parameterLearners);
+    }
+}
+
+%ignore CNTK::Trainer::Trainer;
+
 %unordered_set_conversion(CNTK::Variable, SWIGTYPE_p_CNTK__Variable)
 %unordered_set_conversion(CNTK::Constant, SWIGTYPE_p_CNTK__Constant)
 %unordered_set_conversion(CNTK::Parameter, SWIGTYPE_p_CNTK__Parameter)
@@ -934,7 +961,7 @@ public:
 %shared_ptr(CNTK::MinibatchSource)
 %shared_ptr(CNTK::DistributedCommunicator)
 %shared_ptr(CNTK::QuantizedDistributedCommunicator)
-%shared_ptr(CNTK::DistributedTrainer)
+%shared_ptr(CNTK::DistributedLearner)
 
 %include "CNTKLibraryInternals.h"
 %include "CNTKLibrary.h"
@@ -946,7 +973,7 @@ public:
 // FIXME ignore is ignored
 %ignore CNTK::NDMask::DataBuffer();
 %extend CNTK::NDMask {
-    PyObject* to_numpy() {
+    PyObject* to_ndarray() {
         std::vector<size_t> cntk_dims = (*self).Shape().Dimensions();
         static_assert(cntk_dims.size()==2, "mask requires exactly two dimensions");
         std::vector<size_t> dimensions = {cntk_dims[1], cntk_dims[0]};
@@ -984,30 +1011,7 @@ public:
 
 // end NDMask
 
-//
-// Value
-//
-%extend CNTK::Value {
-    static CNTK::ValuePtr CNTK::Value::CreateDenseFloat(const CNTK::NDShape& sampleShape, const std::vector<std::vector<float>>& sequences, 
-        const CNTK::DeviceDescriptor& device, bool readOnly = false) {
-        return CNTK::Value::Create<float>(sampleShape, sequences, device, readOnly);
-    }
-
-    static CNTK::ValuePtr CNTK::Value::CreateDenseDouble(const CNTK::NDShape& sampleShape, const std::vector<std::vector<double>>& sequences, 
-        const CNTK::DeviceDescriptor& device, bool readOnly = false) {
-        return CNTK::Value::Create<double>(sampleShape, sequences, device, readOnly);
-    }
-
-    static CNTK::ValuePtr CNTK::Value::CreateOneHotFloat(size_t vocabularySize, const std::vector<std::vector<size_t>>& oneHotSequences, 
-        const CNTK::DeviceDescriptor& device, bool readOnly = false) {
-        return CNTK::Value::Create<float>(vocabularySize, oneHotSequences, device, readOnly);
-    }
-
-    static CNTK::ValuePtr CNTK::Value::CreateOneHotDouble(size_t vocabularySize, const std::vector<std::vector<size_t>>& oneHotSequences, 
-        const CNTK::DeviceDescriptor& device, bool readOnly = false) {
-        return CNTK::Value::Create<double>(vocabularySize, oneHotSequences, device, readOnly);
-    }
-}
+%include "CNTKValueExtend.i"
 
 //
 // NDArrayView
@@ -1035,7 +1039,7 @@ public:
         for (int i=0; i<rank; i++)
         {
             shape[rank-i-1] = np_shape[i];
-            num_elements *= np_shape[i];            
+            num_elements *= np_shape[i];
         }
 
         int typecode = PyArray_TYPE(array);
@@ -1119,7 +1123,7 @@ public:
         return view;
     }
 
-    PyObject* to_numpy() {
+    PyObject* to_ndarray() {
         PyObject *NDArrayViewToNumPy(const CNTK::NDArrayView*);
         return NDArrayViewToNumPy(self);
     }

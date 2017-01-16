@@ -772,20 +772,30 @@ template class DummyCriterionNode<double>;
 
 //template<typename T>
 //using TensorFunctionFunc = typename void(*)  ( TensorView<ElemType>&);
-//using TouchCallBack = void(*)(GLRenderer*, const MotionEvent&, std::vector<T >);
 
 
 
+typedef void *(*externalFunc)(void *);
 
+//static  fmap;
+//
+//static map <string, externalFunc> create_map()
+//	{
+//		map <string, externalFunc> m;
+//		return m;
+//	}
+
+
+map <string, externalFunc>& get_map();
 
 template <class ElemType>
 class FunctionNode : public ComputationNode<ElemType>, public NumInputs<1>
 {
 //	using TensorFunctionFunc = void(*)  (TensorView<ElemType>&);
 	typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;
-	typedef void(*TensorFunctionFunc)  (TensorView<ElemType>&);
+
 	
-	static const std::wstring TypeName() { return L"Trace"; }
+	static const std::wstring TypeName() { return L"Function"; }
 
 public:
 	FunctionNode(DEVICEID_TYPE deviceId, const wstring& name)
@@ -809,16 +819,17 @@ private:
 	//void Log(const FrameRange& fr, bool logGradientInstead) const;
 	void FunctionNodeExternCall(TensorView<ElemType>& tensor);
 //	TensorFunctionFunc GetFunc();
-	void GetFunc();
-
-private:
-	static map <string, TensorFunctionFunc> create_map()
-	{
-		map <string, TensorFunctionFunc> m;
-		return m;
-	}
+//	void GetFunc();
+//public:  // should be priv
+//	static map <string, externalFunc> fmap;
+//
+//private:
+//	static map <string, externalFunc> create_map()
+//	{
+//		map <string, externalFunc> m;
+//		return m;
+//	}
 	//typedef int (A::*MFP)(int);
-	static map <string, TensorFunctionFunc> fmap;
 
 	//int f(int x) { return x + 1; }
 	//int g(int x) { return x + 2; }

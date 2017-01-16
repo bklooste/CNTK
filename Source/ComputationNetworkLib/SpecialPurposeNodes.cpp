@@ -13,7 +13,9 @@
 #include <memory>
 
 
+
 namespace Microsoft { namespace MSR { namespace CNTK {
+
 
 // -----------------------------------------------------------------------
 // Trace (node, say='', logFrequency=10, logFirst=10, logGradientToo=false, onlyUpToRow=100000000, onlyUpToT=100000000, format=[])
@@ -212,75 +214,72 @@ template <class ElemType>
 	//Log(fr, false/*means log value*/);
 }
 
+
+//CHANGE THIS TO A GLOBAL LIST
 template <class ElemType>
 /*virtual*/ void FunctionNode<ElemType>::FunctionNodeExternCall(TensorView<ElemType>& tensor)
 {
+	auto fmap = get_map();
+	typename map<string, externalFunc>::iterator it = fmap.find(m_funcName);  
 	
-	//typename map<string, TensorFunctionFunc>::iterator it = fmap.find(m_funcName);
-		typename map<string, TensorFunctionFunc>::iterator it = fmap.find("f");
-
-
-	TensorFunctionFunc func; 
+	externalFunc func;
+	
 	if (it == fmap.end()) 
-	{ // if no instance with the proper type was found, make one
-		GetFunc(); // lazy initialization part
-	}
+		func = (externalFunc) Plugin::Load("./hello.so", &m_funcName);
 	else 
-	{ //if already had an instance
-		func = it->second; //The return value will be the found fruit
-	}
+		func = it->second; 
 
-	func(tensor);
+	func((void*) tensor);
 }
 
 
 
-template <class ElemType>
-/*virtual*/ void FunctionNode<ElemType>::GetFunc() /*override*/
-{
-	//fmap[type] = func;     // adding the newly created Fruit to the types map for later lookup
+//externalFunc GetFunc() /*override*/
+//{
+//	//fmap[type] = func;     // adding the newly created Fruit to the types map for later lookup
+//
+//	fprintf(stdout, "C++ dlopen");
+//
+//
+//	// open the library
+//	fprintf(stdout, "Opening hello.so...\n");
+//	void* handle = dlopen("./hello.so", RTLD_LAZY);
+//
+//
+//	if (!handle) {
+//	/*	auto msg = "Cannot open library" + std::to_string(dlerror());
+//		fprintf(stdout, msg);
+//		throw std::exception(msg);*/
+//		RuntimeError("Cannot open library '%s'", dlerror());
+//	}
+//
+//	// load the symbol
+////	cout << "Loading symbol hello...\n";
+//	//typedef void(*hello_t)();
+//
+//	// reset errors
+//	dlerror();
+//	TensorFunctionFunc hello = (TensorFunctionFunc)dlsym(handle, m_funcName.c_str());
+//	const char *dlsym_error = dlerror();
+//	if (dlsym_error) {
+//		//cerr << "Cannot load symbol 'hello': " << dlsym_error <<
+//		//	'\n';
+//		dlclose(handle);
+//		RuntimeError("FunctionNode Cannot load symbol  '%s'", dlsym_error);
+//	//	throw std::exception("Cannot load symbol 'hello': " , );
+//		//return 1;
+//	}
+//
+//	// use it to do the calculation
+////	cout << "Calling hello...\n";
+//	//hello();
+//
+//	// close the library
+//	fprintf(stdout, "Closing library...\n");
+//	dlclose(handle);
+//
+//}
 
-	fprintf(stdout, "C++ dlopen");
-
-
-	// open the library
-	fprintf(stdout, "Opening hello.so...\n");
-	void* handle = dlopen("./hello.so", RTLD_LAZY);
-
-
-	if (!handle) {
-	/*	auto msg = "Cannot open library" + std::to_string(dlerror());
-		fprintf(stdout, msg);
-		throw std::exception(msg);*/
-		RuntimeError("Cannot open library '%s'", dlerror());
-	}
-
-	// load the symbol
-//	cout << "Loading symbol hello...\n";
-	//typedef void(*hello_t)();
-
-	// reset errors
-	dlerror();
-	TensorFunctionFunc hello = (TensorFunctionFunc)dlsym(handle, m_funcName.c_str());
-	const char *dlsym_error = dlerror();
-	if (dlsym_error) {
-		//cerr << "Cannot load symbol 'hello': " << dlsym_error <<
-		//	'\n';
-		dlclose(handle);
-		RuntimeError("FunctionNode Cannot load symbol  '%s'", dlsym_error);
-	//	throw std::exception("Cannot load symbol 'hello': " , );
-		//return 1;
-	}
-
-	// use it to do the calculation
-//	cout << "Calling hello...\n";
-	//hello();
-
-	// close the library
-	fprintf(stdout, "Closing library...\n");
-	dlclose(handle);
-
-}
 
 template <class ElemType>
 /*virtual*/ void FunctionNode<ElemType>::BackpropTo(const size_t inputIndex, const FrameRange& fr) /*override*/
@@ -295,10 +294,6 @@ template <class ElemType>
 	// call function with derivative appended to name
 
 	sliceInputGrad.AddCopyOf(sliceOutputGrad);
-
-	//// do the tracing
-	//if (m_logGradientToo)
-	//	Log(fr, true/*means log gradient*/);
 }
 
 
@@ -316,19 +311,23 @@ template <class ElemType>
 }
 
 
+
+
 template class FunctionNode<float>;
 template class FunctionNode<double>;
-
-//
-//template class FunctionNode<float>;
-//template class FunctionNode<double>;
 
 
 //const FunctionNode<float>::fmap = FunctionNode<float>::create_map();
 //FunctionNode<double>::fmap = FunctionNode<double>::create_map();
 
 //
-//template <class ElemType>
-//const map <string, TensorFunctionFunc> FunctionNode::fmap = FunctionNode::create_map();
+//fmap = FunctionNode::create_map();
+map<string, externalFunc>& get_map()
+{
+	static map<string, externalFunc> functions_map;
+	return functions_map;
+}
 
-}}}
+}
+
+}}

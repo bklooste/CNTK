@@ -777,6 +777,7 @@ template class DummyCriterionNode<double>;
 
 typedef void *(*externalFunc)(void *);
 
+//class Plugin;
 //static  fmap;
 //
 //static map <string, externalFunc> create_map()
@@ -789,7 +790,7 @@ typedef void *(*externalFunc)(void *);
 map <string, externalFunc>& get_map();
 
 template <class ElemType>
-class FunctionNode : public ComputationNode<ElemType>, public NumInputs<1>
+class FunctionNode : public ComputationNode<ElemType>, public NumInputs<1> , protected Plugin
 {
 //	using TensorFunctionFunc = void(*)  (TensorView<ElemType>&);
 	typedef ComputationNode<ElemType> Base; UsingComputationNodeMembersBoilerplate;

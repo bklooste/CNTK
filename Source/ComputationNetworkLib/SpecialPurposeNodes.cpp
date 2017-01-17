@@ -7,6 +7,7 @@
 #include "ComputationNode.h"
 #include "SpecialPurposeNodes.h"
 
+
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -220,16 +221,21 @@ template <class ElemType>
 /*virtual*/ void FunctionNode<ElemType>::FunctionNodeExternCall(TensorView<ElemType>& tensor)
 {
 	auto fmap = get_map();
-	typename map<string, externalFunc>::iterator it = fmap.find(m_funcName);  
-	
+	typename map<string, externalFunc>::iterator it = fmap.find(m_funcName);
+
 	externalFunc func;
-	
-	if (it == fmap.end()) 
-		func = (externalFunc) Plugin::Load("./hello.so", &m_funcName);
+
+	if (it == fmap.end())
+	{
+		std::string module = "./hello.so";
+		//CreateDeserializerFactory f = (CreateDeserializerFactory)Plugin::Load(deserializerModule, "CreateDeserializer");
+		func = (externalFunc) Plugin::Load("abc", "f");
+	}
 	else 
 		func = it->second; 
-
-	func((void*) tensor);
+	
+	void* ptr = (void*) &tensor;
+	func( ptr);
 }
 
 
